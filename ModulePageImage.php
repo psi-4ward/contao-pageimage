@@ -47,10 +47,12 @@ class ModulePageImage extends Module
 
 			return $objTemplate->parse();
 		}
+		
+		$this->import('PageImage');
 
 		$strBuffer = parent::generate();
 		
-		if (!strlen($this->Template->src))
+		if ($this->Template->src == '')
 			return '';
 			
 		return $strBuffer;
@@ -59,70 +61,21 @@ class ModulePageImage extends Module
 	
 	protected function compile()
 	{
-		global $objPage;
+		$arrImage = $this->PageImage->getPageImage($this->levelOffset, $this->inheritPageImage);
 		
-		$arrSize = deserialize($this->imgSize);
-		
-		// Current page has an image
-		if (strlen($objPage->pageImage))
+		if ($arrImage === false)
 		{
-			$strImage = $this->getImage($objPage->pageImage, $arrSize[0], $arrSize[1], $arrSize[2]);
-			
-			$this->Template->src = $strImage;
-			$this->Template->alt = $objPage->pageImageAlt;
-			
-			if (($imgSize = @getimagesize(TL_ROOT . '/' . $strImage)) !== false)
-			{
-				$this->Template->size = ' ' . $imgSize[3];
-			}
-			
-			if ($objPage->pageImageJumpTo)
-			{
-				$objJumpTo = $this->Database->prepare("SELECT * FROM tl_page WHERE id=?")->limit(1)->execute($objPage->pageImageJumpTo);
-				
-				if ($objJumpTo->numRows)
-				{
-					$this->Template->hasLink = true;
-					$this->Template->title = $objPage->pageImageTitle ? $objPage->pageImageTitle : ($objJumpTo->pageTitle ? $objJumpTo->pageTitle : $objJumpTo->title);
-					$this->Template->href = $this->generateFrontendUrl(array('id'=>$objJumpTo->id, 'alias'=>$objJumpTo->alias));
-				}
-			}
+			return;
 		}
 		
-		// Walk the trail
-		elseif ($this->inheritPageImage && count($objPage->trail))
+		$arrSize = deserialize($this->imgSize);
+		$arrImage['src'] = $this->getImage($arrImage['src'], $arrSize[0], $arrSize[1], $arrSize[2]);
+		
+		$this->Template->setData($arrImage);
+		
+		if (($imgSize = @getimagesize(TL_ROOT . '/' . $arrImage['src'])) !== false)
 		{
-			$objTrail = $this->Database->execute("SELECT * FROM tl_page WHERE id IN (" . implode(',', $objPage->trail) . ") ORDER BY id=" . implode(' DESC, id=', array_reverse($objPage->trail)) . " DESC");
-			
-			while( $objTrail->next() )
-			{
-				if (strlen($objTrail->pageImage))
-				{
-					$strImage = $this->getImage($objTrail->pageImage, $arrSize[0], $arrSize[1], $arrSize[2]);
-					
-					$this->Template->src = $strImage;
-					$this->Template->alt = $objTrail->pageImageAlt;
-					
-					if (($imgSize = @getimagesize(TL_ROOT . '/' . $strImage)) !== false)
-					{
-						$this->Template->size = ' ' . $imgSize[3];
-					}
-					
-					if ($objTrail->pageImageJumpTo)
-					{
-						$objJumpTo = $this->Database->prepare("SELECT * FROM tl_page WHERE id=?")->limit(1)->execute($objTrail->pageImageJumpTo);
-						
-						if ($objJumpTo->numRows)
-						{
-							$this->Template->hasLink = true;
-							$this->Template->title = $objTrail->pageImageTitle ? $objTrail->pageImageTitle : ($objJumpTo->pageTitle ? $objJumpTo->pageTitle : $objJumpTo->title);
-							$this->Template->href = $this->generateFrontendUrl($objJumpTo->row());
-						}
-					}
-					
-					return;
-				}
-			}
+			$this->Template->size = ' ' . $imgSize[3];
 		}
 	}
 }
